@@ -4,5 +4,5 @@ import { auth } from "./app/_lib/auth";
 export const middleware = auth;
 
 export const config = {
-    matcher: ["/profile"]
+    matcher: ["/", "/events",'/search','/create','/profile']
 };

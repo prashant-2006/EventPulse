@@ -5,23 +5,26 @@ import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
 import {
   MagnifyingGlassIcon,
-  InformationCircleIcon,
   SunIcon,
   MoonIcon,
   UserIcon,
+  CalendarDaysIcon,
+  PlusCircleIcon,
 } from '@heroicons/react/24/outline';
 import { usePathname } from 'next/navigation';
 
-export default function Navbar({ session}) {
+export default function Navbar({ session }) {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const pathname = usePathname();
 
   useEffect(() => setMounted(true), []);
 
+  // Updated links for the events website
   const links = [
+    { href: '/events', icon: CalendarDaysIcon, label: 'Events' },
     { href: '/search', icon: MagnifyingGlassIcon, label: 'Search' },
-    { href: '/about', icon: InformationCircleIcon, label: 'About' },
+    { href: '/create', icon: PlusCircleIcon, label: 'Create Event' },
   ];
 
   const activeClasses =
@@ -30,25 +33,17 @@ export default function Navbar({ session}) {
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-3 bg-white text-black dark:bg-gray-800 dark:text-white shadow-md border-b border-gray-300 dark:border-gray-700">
       {/* Logo */}
-      <Link href="/" className="flex items-center gap-2">
-        <div
-          className={`w-12 h-12 rounded-full overflow-hidden border-2 flex justify-center items-center ${
-            theme === 'dark' ? 'border-gray-950' : 'border-gray-700'
-          }`}
-        >
-          <img
-            src="https://t3.ftcdn.net/jpg/01/71/29/48/360_F_171294824_FDLwEWTzlfVr8iE0qojO0mmai44fdbIj.jpg"
-            alt="Logo"
-            className="w-14 h-14 object-cover"
-          />
+      <Link href="/" className="flex items-center gap-3">
+        <div className="p-2 rounded-lg bg-indigo-500 text-white">
+          <CalendarDaysIcon className="w-8 h-8" />
         </div>
-        <span className="text-3xl font-bold hidden sm:inline">GameShelf</span>
+        <span className="text-3xl font-bold hidden sm:inline">EventPulse</span>
       </Link>
 
       {/* Links & Controls */}
       <div className="flex items-center gap-2 sm:gap-4">
-        {links.map(({ href, icon: Icon }) => (
-          <Link key={href} href={href} title={href}>
+        {links.map(({ href, icon: Icon, label }) => (
+          <Link key={href} href={href} title={label}>
             <div
               className={`p-2 rounded-full transition hover:shadow-md hover:bg-gray-200 dark:hover:bg-indigo-900 ${
                 pathname === href
@@ -67,7 +62,7 @@ export default function Navbar({ session}) {
             <img
               src={session.user.image}
               alt="User Avatar"
-              referrerPolicy='no-referrer'
+              referrerPolicy="no-referrer"
               className="w-10 h-10 rounded-full border-2 border-indigo-500 hover:border-indigo-700 transition cursor-pointer object-cover"
             />
           ) : (
@@ -83,7 +78,7 @@ export default function Navbar({ session}) {
             title="Toggle Theme"
           >
             {theme === 'dark' ? (
-              <SunIcon className="w-6 h-6 text-indigo-500" />
+              <SunIcon className="w-6 h-6 text-yellow-400" />
             ) : (
               <MoonIcon className="w-6 h-6 text-indigo-500" />
             )}

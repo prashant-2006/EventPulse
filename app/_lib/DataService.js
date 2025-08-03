@@ -1,4 +1,3 @@
-import { auth } from "./auth";
 import { supabase } from "./supabase";
 
 export async function getUser(email){
@@ -31,58 +30,6 @@ export async function createUser({ email, name, image }) {
   return data;
 }
 
-export async function getGames({ selectedStatus, selectedYear } = {}) {
-  const session = await auth();
-  const userId = session?.user?.userID;
-  if (!userId) return [];
-
-  const { data, error } = await supabase
-    .from("games")
-    .select("game_id, status, completed_on")
-    .eq("user_id", userId);
-
-  if (error) {
-    console.error("Error fetching games:", error);
-    throw new Error("Could not fetch games");
-  }
-
-  let filteredData = data;
-
-  // Filter by status
-  if (selectedStatus && selectedStatus !== "All") {
-    filteredData = filteredData.filter((game) => game.status === selectedStatus);
-  }
-
-  // Filter by year from last 4 characters of completed_on string
-  if (selectedYear && selectedYear !== "All Years") {
-    filteredData = filteredData.filter((game) =>
-      game.completed_on?.slice(-4) === selectedYear
-    );
-  }
-
-  return filteredData.map((item) => item.game_id);
-}
-
-
-
-export default async function getGameData(gameID) {
-  const session = await auth();
-  const userId = session?.user?.userID;
-
-  const { data: games, error } = await supabase
-    .from('games')
-    .select('*')
-    .eq('game_id', gameID)
-    .eq('user_id', userId);
-
-  if (error) {
-    console.error(error);
-    throw new Error(error);
-  }
-
-  return games;
-}
-
 export async function getUserData(email){
    let { data, error } = await supabase
   .from('users')
@@ -96,21 +43,104 @@ export async function getUserData(email){
     return data || null;
 }
 
-export async function getGamesData() {
-  const session = await auth();
-  const userId = session?.user?.userID;
-
-  if (!userId) throw new Error("User not authenticated");
-
+export async function getEvents() {
   const { data, error } = await supabase
-    .from("games")
-    .select("*")
-    .eq("user_id", userId);
+    .from('events')
+    .select('*') // Removed the join to 'profiles'
+    .order('event_date', { ascending: true });
 
   if (error) {
-    console.error("Error fetching games:", error);
-    throw new Error("Could not fetch games");
+    console.error('Error fetching events:', error);
+    throw new Error('Events could not be loaded');
   }
 
+  return data;
+}
+
+export async function createEvent(eventData) {
+  const { data, error } = await supabase.from('events').insert([eventData]);
+
+  if (error) {
+    console.error('Error creating event:', error);
+    throw new Error('Event could not be created.');
+  }
+
+  return data;
+}
+
+export async function getRsvpsForEvent(eventId) {
+  const { data, error } = await supabase
+    .from('rsvps')
+    .select('user_id')
+    .eq('event_id', eventId);
+
+  if (error) {
+    console.error('Error fetching RSVPs:', error);
+    return [];
+  }
+  return data;
+}
+
+// Adds an RSVP for the current user to a specific event
+export async function addRsvp(eventId, userId) {
+  if (!userId) throw new Error('User must be logged in to RSVP.');
+
+  const { error } = await supabase
+    .from('rsvps')
+    .insert({ event_id: eventId, user_id: userId });
+
+  if (error) {
+    console.error('Error adding RSVP:', error);
+    throw new Error('Could not RSVP for the event.');
+  }
+}
+
+// Removes an RSVP for the current user from a specific event
+export async function removeRsvp(eventId, userId) {
+  if (!userId) throw new Error('User must be logged in to cancel RSVP.');
+
+  const { error } = await supabase
+    .from('rsvps')
+    .delete()
+    .eq('event_id', eventId)
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('Error removing RSVP:', error);
+    throw new Error('Could not cancel RSVP.');
+  }
+}
+
+export async function getCommentsForEvent(eventId) {
+  const { data, error } = await supabase
+    .from('comments')
+    .select(`
+      *,
+      users ( name )
+    `)
+    .eq('event_id', eventId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching comments:', error);
+    return [];
+  }
+  return data;
+}
+
+// Adds a new comment
+export async function addComment(eventId, userId, content) {
+  if (!userId) throw new Error('User must be logged in to comment.');
+
+  const { data, error } = await supabase
+    .from('comments')
+    .insert({ event_id: eventId, user_id: userId, content: content })
+    .select('*, users ( name )') // Return the new comment with user info
+    .single();
+
+  if (error) {
+    console.error('Error adding comment:', error);
+    throw new Error('Could not post comment.');
+  }
   return data;
 }

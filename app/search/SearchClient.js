@@ -1,68 +1,115 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import GameCard from './gameCard';
-import LoadingSpinner from '../loading';
 
-export default function SearchClient({gameList, session}) {
-  const [games, setGames] = useState([]);
-  const [query, setQuery] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [isRouting, setIsRouting] = useState(false); // <-- new state
-  const router = useRouter();
+import { useState, useMemo } from 'react';
+import EventCard from '../events/EventCard'; // Assuming EventCard is in this location
+import { addRsvp, removeRsvp } from '../_lib/DataService';
 
-  const searchGames = async () => {
-    if (!query) return;
-    setLoading(true);
-    const res = await fetch(
-      `https://api.rawg.io/api/games?key=a98780749aad4b9c8897d8bec2152282&search=${query}`
-    );
-    const data = await res.json();
-    setGames(data.results || []);
-    setLoading(false);
+// List of categories to filter by
+const allCategories = [
+  'HTML', 'CSS', 'JavaScript', 'React', 'Angular', 'Vue.js', 'Node.js', 'Python',
+  'Django', 'Flask', 'Java', 'Spring', 'Go', 'PHP', 'Laravel', 'Ruby on Rails',
+  'Swift', 'Kotlin', 'React Native', 'Flutter', 'SQL', 'PostgreSQL', 'MySQL',
+  'MongoDB', 'Firebase', 'AWS', 'Azure', 'Google Cloud', 'Docker', 'Kubernetes',
+  'CI/CD', 'Git', 'UI Design', 'UX Design', 'Figma', 'Adobe XD',
+  'Project Management', 'Agile', 'Scrum', 'Public Speaking', 'Marketing',
+  'Content Writing', 'Graphic Design', 'Leadership', 'Teamwork', 'Problem Solving'
+];
+
+
+export default function SearchClient({ initialEvents, currentUserId, session }) {
+  const [events, setEvents] = useState(initialEvents);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [dateFilter, setDateFilter] = useState(''); // 'upcoming', 'past'
+
+  // Memoize the filtered events to avoid re-calculating on every render
+  const filteredEvents = useMemo(() => {
+    return events.filter(event => {
+      const matchesSearch = event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            event.description.toLowerCase().includes(searchQuery.toLowerCase());
+
+      const matchesCategory = categoryFilter ? event.category?.includes(categoryFilter) : true;
+
+      const eventDate = new Date(event.event_date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Normalize today's date
+
+      let matchesDate = true;
+      if (dateFilter === 'upcoming') {
+        matchesDate = eventDate >= today;
+      } else if (dateFilter === 'past') {
+        matchesDate = eventDate < today;
+      }
+
+      return matchesSearch && matchesCategory && matchesDate;
+    });
+  }, [events, searchQuery, categoryFilter, dateFilter]);
+
+  const handleRsvp = async (eventId) => {
+    await addRsvp(eventId, currentUserId);
+    // Optimistically update UI
+    setEvents(current => current.map(e => e.id === eventId ? {...e, rsvps: [...e.rsvps, {user_id: currentUserId}]} : e));
   };
 
-  const handleCardClick = (gameId) => {
-    setIsRouting(true);
-    router.push(`/search/${gameId}`);
+  const handleCancelRsvp = async (eventId) => {
+    await removeRsvp(eventId, currentUserId);
+    // Optimistically update UI
+    setEvents(current => current.map(e => e.id === eventId ? {...e, rsvps: e.rsvps.filter(r => r.user_id !== currentUserId)} : e));
   };
-
-  useEffect(() => {
-    // Automatically stops loading when route changes
-    const handleDone = () => setIsRouting(false);
-    window.addEventListener('popstate', handleDone);
-    return () => window.removeEventListener('popstate', handleDone);
-  }, []);
-
-  const showLoader = loading || isRouting;
 
   return (
-    <div className="p-6">
-      <div className="flex mb-4">
+    <div>
+      {/* Filter Controls */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 p-4 bg-white dark:bg-gray-800 rounded-lg shadow">
+        {/* Search Bar */}
         <input
           type="text"
-          placeholder="Search for a game..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="w-full px-4 py-2 rounded-l-lg border dark:bg-gray-800 dark:border-gray-700"
+          placeholder="Search by title or description..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full p-2 rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
         />
-        <button
-          onClick={searchGames}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-r-lg hover:bg-indigo-700 transition"
+
+        {/* Category Filter */}
+        <select
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+          className="w-full p-2 rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
         >
-          Search
-        </button>
+          <option value="">All Categories</option>
+          {allCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+        </select>
+
+        {/* Date Filter */}
+        <select
+          value={dateFilter}
+          onChange={(e) => setDateFilter(e.target.value)}
+          className="w-full p-2 rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+        >
+          <option value="">All Dates</option>
+          <option value="upcoming">Upcoming Events</option>
+          <option value="past">Past Events</option>
+        </select>
       </div>
-      {!session && <p className='text-gray-500 my-4 ml-1'>Login to add games to Library</p>}
 
-      {showLoader && <LoadingSpinner />}
-
-      {!showLoader && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-2">
-          {games.map((game) => (
-            <GameCard key={game.id} game={game} session={session} gameList={gameList} onClick={() => handleCardClick(game.id)} />
+      {/* Results Grid */}
+      {filteredEvents.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredEvents.map((event) => (
+            <EventCard
+              key={event.id}
+              event={event}
+              currentUserId={currentUserId}
+              isLoggedIn={!!session}
+              onRsvp={handleRsvp}
+              onCancelRsvp={handleCancelRsvp}
+            />
           ))}
         </div>
+      ) : (
+        <p className="text-center text-gray-500 dark:text-gray-400 mt-10">
+          No events found matching your criteria.
+        </p>
       )}
     </div>
   );
